@@ -14,6 +14,8 @@ const float TARGET_ASPECT_RATIO = (float)TARGET_WIDTH / TARGET_HEIGHT;
 int viewHeights[TARGET_WIDTH];
 const int MAX_DISTANCE = 999999;
 
+float fov = 60;
+
 const int LEVEL_ROWS = 10;
 const int LEVEL_COLUMNS = 10;
 int levelData[LEVEL_ROWS][LEVEL_COLUMNS] = {
@@ -42,7 +44,7 @@ float playerRightY;
 
 const int PLAYER_DIRECTION_LENGTH = 30;
 const float PLAYER_TURN_SPEED = 180;
-float playerAngle = 90;
+float playerAngle = 270;
 
 Uint64 previousTimestampMs;
 float deltaTimeSeconds;
@@ -105,7 +107,7 @@ void drawMap(SDL_Renderer* renderer) {
     for (int row = 0; row < LEVEL_ROWS; row++) {
         for (int column = 0; column < LEVEL_COLUMNS; column++) {
             if (levelData[row][column] > 0) {
-                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+                SDL_SetRenderDrawColor(renderer, 192, 192, 192, 255);
             } else {
                 SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             }
@@ -273,26 +275,38 @@ float calculateSquaredDistanceToHorizontalLineCollision(float angle) {
 }
 
 void castRays(SDL_Renderer* renderer) {
-    //TODO USE DIFFERENT ANGLES
-    float distanceToVerticalLineCollision = sqrtf(calculateSquaredDistanceToVerticalLineCollision(playerAngle));
-    float distanceToHorizontalLineCollision = sqrtf(calculateSquaredDistanceToHorizontalLineCollision(playerAngle));
-    float minimumDistanceToLineCollision = fmin(distanceToVerticalLineCollision, distanceToHorizontalLineCollision);
+    float startAngle = playerAngle - fov / 2;
+    float endAngle = playerAngle + fov / 2;
+    int angleCount = TARGET_WIDTH;
+    float deltaAngle = (endAngle - startAngle) / (angleCount - 1);
 
-    if (isDebugging) {
-        //TODO DRAW RAY
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-        SDL_RenderDrawLine(
-            renderer,
-            mapX + playerX,
-            mapY + playerY,
-            mapX + playerX + playerForwardX * minimumDistanceToLineCollision,
-            mapY + playerY + playerForwardY * minimumDistanceToLineCollision
-        );
-    }
+    for (int angleIndex = 0; angleIndex < angleCount; angleIndex++) {
+        float angle = startAngle + angleIndex * deltaAngle;
+        if (angle >= 360) {
+            angle -= 360;
+        } else if (angle < 0) {
+            angle += 360;
+        }
 
-    //TODO
-    for (int x = 0; x < TARGET_WIDTH; x++) {
-        viewHeights[x] = (float)(x + 1) / TARGET_WIDTH * TARGET_HEIGHT;
+        float distanceToVerticalLineCollision = sqrtf(calculateSquaredDistanceToVerticalLineCollision(angle));
+        float distanceToHorizontalLineCollision = sqrtf(calculateSquaredDistanceToHorizontalLineCollision(angle));
+        float distanceToWallCollision = fmin(distanceToVerticalLineCollision, distanceToHorizontalLineCollision);
+
+        if (isDebugging) {
+            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+            SDL_RenderDrawLine(
+                renderer,
+                mapX + playerX,
+                mapY + playerY,
+                mapX + playerX + cos(degToRad(angle)) * distanceToWallCollision,
+                mapY + playerY + sin(degToRad(angle)) * distanceToWallCollision
+            );
+        }
+
+        // fix fisheye effect
+        distanceToWallCollision = fabs(distanceToWallCollision * cos(degToRad(playerAngle - angle)));
+
+        viewHeights[angleIndex] = LEVEL_BLOCK_SIZE * TARGET_WIDTH / distanceToWallCollision;
     }
 }
 
