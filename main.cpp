@@ -11,8 +11,9 @@ const int TARGET_WIDTH = 320;
 const int TARGET_HEIGHT = 180;
 const float TARGET_ASPECT_RATIO = (float)TARGET_WIDTH / TARGET_HEIGHT;
 
-int viewHeights[TARGET_WIDTH];
 const int MAX_DISTANCE = 999999;
+int viewHeights[TARGET_WIDTH];
+int viewColors[TARGET_WIDTH];
 
 float fov = 60;
 
@@ -92,13 +93,19 @@ void updatePlayerRotationData(float newPlayerAngle) {
     playerRightY = sin(degToRad(playerAngle + 90));
 }
 
-void drawWallLine(SDL_Renderer* renderer, int x, int height) {
+void drawWallLine(SDL_Renderer* renderer, int x, int height, int color) {
     if (height <= 0) {
         return;
     }
 
     int topY = (TARGET_HEIGHT - height) / 2;
     int bottomY = topY + height - 1;
+
+    if (color == 0) {
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    } else {
+        SDL_SetRenderDrawColor(renderer, 0, 192, 0, 255);
+    }
     SDL_RenderDrawLine(renderer, x, topY, x, bottomY);
 }
 
@@ -170,9 +177,8 @@ void renderView(SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 255, 0);
     SDL_RenderClear(renderer);
 
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
     for (int x = 0; x < TARGET_WIDTH; x++) {
-        drawWallLine(renderer, x, viewHeights[x]);
+        drawWallLine(renderer, x, viewHeights[x], viewColors[x]);
     }
 }
 
@@ -290,7 +296,16 @@ void castRays(SDL_Renderer* renderer) {
 
         float distanceToVerticalLineCollision = sqrtf(calculateSquaredDistanceToVerticalLineCollision(angle));
         float distanceToHorizontalLineCollision = sqrtf(calculateSquaredDistanceToHorizontalLineCollision(angle));
-        float distanceToWallCollision = fmin(distanceToVerticalLineCollision, distanceToHorizontalLineCollision);
+
+        float distanceToWallCollision;
+        int wallColor;
+        if (distanceToVerticalLineCollision < distanceToHorizontalLineCollision) {
+            distanceToWallCollision = distanceToVerticalLineCollision;
+            wallColor = 0;
+        } else {
+            distanceToWallCollision = distanceToHorizontalLineCollision;
+            wallColor = 1;
+        }
 
         if (isDebugging) {
             SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
@@ -307,6 +322,7 @@ void castRays(SDL_Renderer* renderer) {
         distanceToWallCollision = fabs(distanceToWallCollision * cos(degToRad(playerAngle - angle)));
 
         viewHeights[angleIndex] = LEVEL_BLOCK_SIZE * TARGET_WIDTH / distanceToWallCollision;
+        viewColors[angleIndex] = wallColor;
     }
 }
 
